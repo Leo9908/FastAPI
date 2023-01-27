@@ -1,16 +1,7 @@
-from fastapi import APIRouter
-from typing import Union
+from fastapi import APIRouter, Depends
 
-router = APIRouter()
+router = APIRouter(prefix='/users')
 
-
-@router.get("/")
-async def read_root():
-    return {"Hello": "World"}
-
-# Las funciones no tienen que ser asincronas obligatoriamnete
-
-
-@router.get("/items/{item_id}")
-async def read_item(item_id: int, q: Union[str, None] = None):
-    return {"item_id": item_id, "q": q}
+@router.post('/create')
+async def create_user():
+    pass
