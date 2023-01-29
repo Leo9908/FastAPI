@@ -11,6 +11,7 @@ class TokenData(BaseModel):
 
 
 class User(BaseModel):
+    id: str | None  # Para especificar que el id puede llegar o no
     username: str
     email: str | None = None
     full_name: str | None = None

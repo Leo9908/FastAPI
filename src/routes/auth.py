@@ -1,30 +1,21 @@
 from datetime import datetime, timedelta
-
+import os
 from fastapi import Depends, APIRouter, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from jose import JWTError, jwt
 from passlib.context import CryptContext
+from src.db.client import db_client
+from src.db.schemas.user import userdb_schema
+from config import setting
 
-from src.models.user import User, UserInDB, Token, TokenData
-
-import os
+from src.db.models.user import User, UserInDB, Token, TokenData
 
 # to get a string like this run:
 # openssl rand -hex 32
-SECRET_KEY = "0e6757ffb5f0c2adc40cd2a6487c6f47b4e61a49d87cd174f4c0ce272a94f13f"
-ALGORITHM = "HS256"
+SECRET_KEY = setting.SECRET_KEY
+ALGORITHM = setting.ALGORITHM
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
-
-fake_users_db = {
-    "johndoe": {
-        "username": "johndoe",
-        "full_name": "John Doe",
-        "email": "johndoe@example.com",
-        "hashed_password": "$2b$12$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36WQoeG6Lruj3vjPGga31lW",
-        "disabled": False,
-    }
-}
 
 router = APIRouter(prefix='/auth')
 
@@ -37,18 +28,16 @@ def verify_password(plain_password, hashed_password):
     return pwd_context.verify(plain_password, hashed_password)
 
 
-def get_password_hash(password):
-    return pwd_context.hash(password)
+def get_user(key: str, value):
+    try:
+        user = userdb_schema(db_client.users.find_one({key: value}))
+        return UserInDB(**user)
+    except:
+        return {'error': 'No se ha encontrado el usuario'}
 
 
-def get_user(db, username: str):
-    if username in db:
-        user_dict = db[username]
-        return UserInDB(**user_dict)
-
-
-def authenticate_user(fake_db, username: str, password: str):
-    user = get_user(fake_db, username)
+def authenticate_user(username: str, password: str):
+    user = get_user('username', username)
     if not user:
         return False
     if not verify_password(password, user.hashed_password):
@@ -81,7 +70,7 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
         token_data = TokenData(username=username)
     except JWTError:
         raise credentials_exception
-    user = get_user(fake_users_db, username=token_data.username)
+    user = get_user('username', token_data.username)
     if user is None:
         raise credentials_exception
     return user
@@ -95,8 +84,7 @@ async def get_current_active_user(current_user: User = Depends(get_current_user)
 
 @router.post("/login", response_model=Token)
 async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends()):
-    user = authenticate_user(
-        fake_users_db, form_data.username, form_data.password)
+    user = authenticate_user(form_data.username, form_data.password)
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
